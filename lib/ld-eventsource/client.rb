@@ -49,6 +49,9 @@ module SSE
     # The default value for `reconnect_reset_interval` in {#initialize}.
     DEFAULT_RECONNECT_RESET_INTERVAL = 60
 
+    # The default value for `method` in {#initialize}.
+    DEFAULT_HTTP_METHOD = "GET"
+
     #
     # Creates a new SSE client.
     #
@@ -66,6 +69,8 @@ module SSE
     #
     # @param uri [String] the URI to connect to
     # @param headers [Hash] ({})  custom headers to send with each HTTP request
+    # @param http_method [String] (DEFAULT_HTTP_METHOD)  method to use for each HTTP request
+    # @param json [{}] (nil)  JSON payload to send with each HTTP request
     # @param connect_timeout [Float] (DEFAULT_CONNECT_TIMEOUT)  maximum time to wait for a
     #   connection, in seconds
     # @param read_timeout [Float] (DEFAULT_READ_TIMEOUT)  the connection will be dropped and
@@ -88,6 +93,8 @@ module SSE
     # 
     def initialize(uri,
           headers: {},
+          http_method: DEFAULT_HTTP_METHOD,
+          json: nil,
           connect_timeout: DEFAULT_CONNECT_TIMEOUT,
           read_timeout: DEFAULT_READ_TIMEOUT,
           reconnect_time: DEFAULT_RECONNECT_TIME,
@@ -100,6 +107,9 @@ module SSE
       @stopped = Concurrent::AtomicBoolean.new(false)
 
       @headers = headers.clone
+      @http_method = http_method
+      @json = json.clone
+
       @connect_timeout = connect_timeout
       @read_timeout = read_timeout
       @logger = logger || default_logger
@@ -264,8 +274,10 @@ module SSE
         cxn = nil
         begin
           @logger.info { "Connecting to event stream at #{@uri}" }
-          cxn = @http_client.request("GET", @uri, {
-            headers: build_headers
+
+          cxn = @http_client.request(@http_method, @uri, {
+            headers: build_headers,
+            json: @json
           })
           if cxn.status.code == 200
             content_type = cxn.headers["content-type"]
